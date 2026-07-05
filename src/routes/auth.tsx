@@ -52,11 +52,14 @@ function AuthPage() {
 
           <div className="mt-6">
             {mode === "signup" ? (
-              <SignUpForm onSuccess={() => navigate({ to: "/dashboard" })} />
+              <SignUpForm onSuccess={() => navigate({ to: "/" })} />
             ) : (
-              <SignInForm onSuccess={() => navigate({ to: "/dashboard" })} />
+              <SignInForm
+                onSuccess={(isAdmin) => navigate({ to: isAdmin ? "/admin" : "/" })}
+              />
             )}
           </div>
+
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
             {mode === "signup" ? (
@@ -91,7 +94,7 @@ function inputCls() {
   return "w-full rounded-md border border-white/10 bg-white/5 px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-[color:var(--neon-cyan)] focus:ring-2 focus:ring-[color:var(--neon-cyan)]/30 transition";
 }
 
-function SignInForm({ onSuccess }: { onSuccess: () => void }) {
+function SignInForm({ onSuccess }: { onSuccess: (isAdmin: boolean) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -99,12 +102,27 @@ function SignInForm({ onSuccess }: { onSuccess: () => void }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setLoading(false);
+      return toast.error(error.message);
+    }
+    const uid = data.user?.id;
+    let isAdmin = false;
+    if (uid) {
+      const { data: r } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", uid)
+        .eq("role", "admin")
+        .maybeSingle();
+      isAdmin = !!r;
+    }
     setLoading(false);
-    if (error) return toast.error(error.message);
     toast.success("Signed in");
-    onSuccess();
+    onSuccess(isAdmin);
   }
+
 
   return (
     <form className="space-y-3" onSubmit={submit}>
