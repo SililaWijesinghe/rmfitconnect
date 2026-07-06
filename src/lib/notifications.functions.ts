@@ -8,12 +8,14 @@ export const approveUser = createServerFn({ method: "POST" })
     z.object({ userId: z.string().uuid() }).parse(data),
   )
   .handler(async ({ data, context }) => {
-    // Verify caller is admin
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    if (!isAdmin) throw new Error("Forbidden");
+    // Verify caller is admin by reading their own role row (RLS allows self-read)
+    const { data: roleRow } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    if (!roleRow) throw new Error("Forbidden");
 
     // Load target profile (admin RLS allows read)
     const { data: target, error: profErr } = await context.supabase
