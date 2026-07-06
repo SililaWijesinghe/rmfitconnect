@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Loader2, Users, Clock, Lock, CheckCircle2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { useBookSlot } from "@/lib/bookings.functions";
 
 export const Route = createFileRoute("/_authenticated/book")({
   component: BookPage,
@@ -82,24 +83,23 @@ function BookPage() {
     return [...build(MORNING, 2, "morning"), ...build(EVENING, 4, "evening")];
   }, [rows, user.id]);
 
+  const bookSlotFn = useBookSlot();
   async function book(slot: SlotInfo) {
     if (status !== "active") {
       toast.error("Your account isn't active yet.");
       return;
     }
     setPending(slot.start);
-    const { error } = await supabase.rpc("book_slot", {
-      _date: fmtDateKey(selected),
-      _start: slot.start,
-    });
-    setPending(null);
-    if (error) {
-      toast.error(error.message.includes("Slot full") ? "That slot just filled" : error.message);
+    try {
+      await bookSlotFn({ data: { date: fmtDateKey(selected), start: slot.start } });
+      toast.success("Booked!");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Booking failed";
+      toast.error(msg.includes("Slot full") ? "That slot just filled" : msg);
+    } finally {
+      setPending(null);
       refresh();
-      return;
     }
-    toast.success("Booked!");
-    refresh();
   }
 
   async function cancel(slot: SlotInfo) {

@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
+import { useBookSlot } from "@/lib/bookings.functions";
 import heroImg from "@/assets/hero-athlete.jpg";
 
 export const Route = createFileRoute("/")({
@@ -421,20 +422,19 @@ function BookingWidget({ userId }: { userId: string }) {
     return [...build(MORNING, 2, "morning"), ...build(EVENING, 4, "evening")];
   }, [rows, userId]);
 
+  const bookSlotFn = useBookSlot();
   async function book(slot: SlotInfo) {
     setPending(slot.start);
-    const { error } = await supabase.rpc("book_slot", {
-      _date: fmtDateKey(selected),
-      _start: slot.start,
-    });
-    setPending(null);
-    if (error) {
-      toast.error(error.message.includes("Slot full") ? "That slot just filled" : error.message);
+    try {
+      await bookSlotFn({ data: { date: fmtDateKey(selected), start: slot.start } });
+      toast.success("Booked!");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Booking failed";
+      toast.error(msg.includes("Slot full") ? "That slot just filled" : msg);
+    } finally {
+      setPending(null);
       refresh();
-      return;
     }
-    toast.success("Booked!");
-    refresh();
   }
 
   async function cancel(slot: SlotInfo) {
