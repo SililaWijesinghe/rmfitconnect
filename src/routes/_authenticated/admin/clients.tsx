@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Loader2, User } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Avatar } from "@/components/Avatar";
+import { calcBMI, bmiCategory } from "@/lib/health-utils";
 
 type Client = {
   id: string;
@@ -11,6 +13,7 @@ type Client = {
   age: number | null;
   height_cm: number | null;
   weight_kg: number | null;
+  avatar_url: string | null;
 };
 type Health = { injuries: string; allergies: string; notes: string } | null;
 
@@ -30,7 +33,7 @@ function AdminClients() {
       setLoading(true);
       const { data } = await supabase
         .from("profiles")
-        .select("id,full_name,phone,status,age,height_cm,weight_kg")
+        .select("id,full_name,phone,status,age,height_cm,weight_kg,avatar_url")
         .order("created_at", { ascending: false });
       setRows((data as Client[] | null) ?? []);
       setLoading(false);
@@ -63,77 +66,115 @@ function AdminClients() {
       </div>
     );
 
-  const opened = rows.find((r) => r.id === openId);
-
   return (
     <div className="space-y-3">
-      {rows.map((c) => (
-        <div key={c.id} className="glass">
-          <button
-            onClick={() => (openId === c.id ? setOpenId(null) : open(c.id))}
-            className="flex w-full items-center gap-3 p-4 text-left"
-          >
-            <div className="btn-neon flex h-10 w-10 items-center justify-center rounded-full font-display">
-              {c.full_name.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1">
-              <p className="font-display font-semibold">{c.full_name}</p>
-              <p className="text-xs text-muted-foreground">
-                {c.phone ?? "no phone"} · <span className="capitalize">{c.status}</span>
-              </p>
-            </div>
-          </button>
-          {opened?.id === c.id && (
-            <div className="border-t border-white/10 p-4 text-sm">
-              <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-                <Stat label="Age" v={c.age} />
-                <Stat label="Height" v={c.height_cm ? `${c.height_cm}cm` : null} />
-                <Stat label="Weight" v={c.weight_kg ? `${c.weight_kg}kg` : null} />
-              </div>
-              <div className="mt-3 space-y-2">
-                <Section title="Injuries" value={health?.injuries} />
-                <Section title="Allergies" value={health?.allergies} />
-                <Section title="Notes" value={health?.notes} />
-              </div>
-              <div className="mt-3">
-                <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  Recent sessions
+      {rows.map((c) => {
+        const bmi = calcBMI(c.height_cm, c.weight_kg);
+        const cat = bmiCategory(bmi);
+        const opened = openId === c.id;
+        const statusCls =
+          c.status === "active"
+            ? "text-emerald-400"
+            : c.status === "denied"
+            ? "text-red-400"
+            : "text-amber-300";
+        return (
+          <div key={c.id} className="glass">
+            <button
+              onClick={() => (opened ? setOpenId(null) : open(c.id))}
+              className="flex w-full items-center gap-3 p-4 text-left"
+            >
+              <Avatar url={c.avatar_url} name={c.full_name} size={44} />
+              <div className="flex-1">
+                <p className="font-display font-semibold">{c.full_name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {c.phone ?? "no phone"} ·{" "}
+                  <span className={`capitalize font-semibold ${statusCls}`}>{c.status}</span>
                 </p>
-                {bookings.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No bookings yet.</p>
-                ) : (
-                  <ul className="space-y-1 text-xs">
-                    {bookings.map((b, i) => (
-                      <li key={i}>
-                        {new Date(b.slot_date).toLocaleDateString()} · {b.slot_start.slice(0, 5)}
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
-            </div>
-          )}
-        </div>
-      ))}
+              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${cat.cls}`}>
+                BMI {bmi ?? "–"}
+              </span>
+            </button>
+            {opened && (
+              <div className="border-t border-white/10 p-4 text-sm">
+                <div className="grid grid-cols-4 gap-2 text-xs text-muted-foreground">
+                  <Stat label="Age" v={c.age} />
+                  <Stat label="Height" v={c.height_cm ? `${c.height_cm}cm` : null} />
+                  <Stat label="Weight" v={c.weight_kg ? `${c.weight_kg}kg` : null} />
+                  <Stat label="BMI" v={bmi} highlight={cat.cls} />
+                </div>
+                <div className={`mt-3 rounded-md border px-3 py-2 text-xs ${cat.cls}`}>
+                  {cat.label}
+                </div>
+                <div className="mt-3 space-y-2">
+                  <Section title="Injuries" value={health?.injuries} danger />
+                  <Section title="Allergies" value={health?.allergies} danger />
+                  <Section title="Notes" value={health?.notes} />
+                </div>
+                <div className="mt-3">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    Recent sessions
+                  </p>
+                  {bookings.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No bookings yet.</p>
+                  ) : (
+                    <ul className="space-y-1 text-xs">
+                      {bookings.map((b, i) => (
+                        <li key={i}>
+                          {new Date(b.slot_date).toLocaleDateString()} · {b.slot_start.slice(0, 5)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function Stat({ label, v }: { label: string; v: string | number | null }) {
+function Stat({
+  label,
+  v,
+  highlight,
+}: {
+  label: string;
+  v: string | number | null;
+  highlight?: string;
+}) {
   return (
-    <div className="glass p-2 text-center">
+    <div className={`glass p-2 text-center ${highlight ?? ""}`}>
       <div className="text-[10px] uppercase">{label}</div>
-      <div className="mt-0.5 font-display text-sm text-foreground">{v ?? "–"}</div>
+      <div className="mt-0.5 font-display text-sm">{v ?? "–"}</div>
     </div>
   );
 }
-function Section({ title, value }: { title: string; value?: string }) {
+function Section({
+  title,
+  value,
+  danger,
+}: {
+  title: string;
+  value?: string;
+  danger?: boolean;
+}) {
+  const has = value?.trim();
   return (
     <div>
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
         {title}
       </p>
-      <p className="mt-0.5 text-sm">{value?.trim() || <span className="text-muted-foreground">—</span>}</p>
+      <p
+        className={`mt-0.5 text-sm ${
+          has && danger ? "text-red-400" : has ? "text-foreground" : "text-muted-foreground"
+        }`}
+      >
+        {has || "—"}
+      </p>
     </div>
   );
 }
