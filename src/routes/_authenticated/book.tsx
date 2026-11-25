@@ -5,6 +5,12 @@ import { Loader2, Users, Clock, Lock, CheckCircle2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useBookSlot } from "@/lib/bookings.functions";
+import {
+  GuideButton,
+  SpotlightTour,
+  useFirstVisitGuide,
+  type GuideStep,
+} from "@/components/SpotlightTour";
 
 export const Route = createFileRoute("/_authenticated/book")({
   component: BookPage,
@@ -14,6 +20,29 @@ const MORNING = ["06:30", "07:30", "08:30", "09:30"];
 const EVENING = ["15:30", "16:30", "17:30", "18:30", "19:30", "20:30", "21:30"];
 
 type SlotInfo = { start: string; count: number; cap: number; period: "morning" | "evening"; mine: boolean };
+
+const BOOK_GUIDE: GuideStep[] = [
+  {
+    target: "book-dates",
+    title: "Start with the day",
+    body: "Scroll this strip for the next 14 days. Today is selected for you.",
+  },
+  {
+    target: "book-morning",
+    title: "Morning sessions",
+    body: "06:30 to 09:30, two clients per hour. Tap an open slot to take it.",
+  },
+  {
+    target: "book-evening",
+    title: "Evening sessions",
+    body: "15:30 to 21:30, four clients per hour. Full slots lock themselves.",
+  },
+  {
+    target: "book-sessions-link",
+    title: "Your bookings live here",
+    body: "My sessions lists everything you've booked — and lets you cancel.",
+  },
+];
 
 function nextDates(n: number) {
   const arr: Date[] = [];
@@ -41,6 +70,10 @@ function BookPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<{ start: string; period: string } | null>(null);
+  const guide = useFirstVisitGuide("rm.guide.book.v1");
+
+  useEffect(() => setConfirmed(null), [selected]);
 
   useEffect(() => {
     (async () => {
@@ -93,6 +126,7 @@ function BookPage() {
     try {
       await bookSlotFn({ data: { date: fmtDateKey(selected), start: slot.start } });
       toast.success("Booked!");
+      setConfirmed({ start: slot.start, period: slot.period });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Booking failed";
       toast.error(msg.includes("Slot full") ? "That slot just filled" : msg);
@@ -112,18 +146,22 @@ function BookPage() {
       .eq("slot_start", slot.start);
     setPending(null);
     if (error) return toast.error(error.message);
+    setConfirmed(null);
     toast.success("Session cancelled");
     refresh();
   }
 
   return (
     <div className="space-y-5 pt-4">
-      <div>
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">Sessions</p>
-        <h1 className="mt-1 font-display text-3xl font-bold">Book a slot</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          1-hour sessions. Morning caps at 2, evening caps at 4.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">Sessions</p>
+          <h1 className="mt-1 font-display text-3xl font-bold">Book a slot</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            1-hour sessions. Morning caps at 2, evening caps at 4.
+          </p>
+        </div>
+        <GuideButton onClick={() => guide.setOpen(true)} />
       </div>
 
       {status === "pending" && (
@@ -132,7 +170,62 @@ function BookPage() {
         </div>
       )}
 
-      <div className="-mx-4 overflow-x-auto px-4">
+      {confirmed && (
+        <div className="rm-pop glass-strong border border-white/25 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                Booking confirmed
+              </p>
+              <p className="rm-tabular mt-2 font-display text-3xl tracking-wide">
+                {selected.toLocaleDateString(undefined, {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "short",
+                })}{" "}
+                · {confirmed.start}
+              </p>
+              <p className="mt-1 text-xs capitalize text-muted-foreground">
+                {confirmed.period} session · 1 hour
+              </p>
+            </div>
+            <CheckCircle2 className="size-6 shrink-0" aria-hidden="true" />
+          </div>
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+            {[
+              "Arrive 10 minutes early to warm up",
+              "Bring water, a towel and trainers",
+              "Tap this slot again to cancel",
+              "Cancel the day before if plans change",
+            ].map((step) => (
+              <li key={step} className="flex items-start gap-2 text-sm">
+                <CheckCircle2
+                  className="mt-0.5 size-4 shrink-0 text-[color:var(--neon-cyan)]"
+                  aria-hidden="true"
+                />
+                <span className="text-pretty">{step}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Link
+              to="/my-bookings"
+              className="text-xs text-[color:var(--neon-cyan)] underline underline-offset-4"
+            >
+              See it in My sessions →
+            </Link>
+            <button
+              type="button"
+              onClick={() => setConfirmed(null)}
+              className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="-mx-4 overflow-x-auto px-4" data-tour="book-dates">
         <div className="flex gap-2">
           {dates.map((d) => {
             const active = fmtDateKey(d) === fmtDateKey(selected);
@@ -166,6 +259,7 @@ function BookPage() {
         onBook={book}
         onCancel={cancel}
         canBook={status === "active"}
+        tourId="book-morning"
       />
       <SlotSection
         title="Evening · 15:30 → 22:30"
@@ -176,14 +270,23 @@ function BookPage() {
         onBook={book}
         onCancel={cancel}
         canBook={status === "active"}
+        tourId="book-evening"
       />
 
       <Link
         to="/my-bookings"
+        data-tour="book-sessions-link"
         className="glass block rounded-md p-4 text-center text-sm hover:bg-white/[0.08]"
       >
         View my sessions →
       </Link>
+
+      <SpotlightTour
+        steps={BOOK_GUIDE}
+        open={guide.open}
+        onOpenChange={guide.setOpen}
+        onComplete={guide.markSeen}
+      />
     </div>
   );
 }
@@ -197,6 +300,7 @@ function SlotSection({
   onBook,
   onCancel,
   canBook,
+  tourId,
 }: {
   title: string;
   cap: number;
@@ -206,9 +310,10 @@ function SlotSection({
   onBook: (s: SlotInfo) => void;
   onCancel: (s: SlotInfo) => void;
   canBook: boolean;
+  tourId?: string;
 }) {
   return (
-    <div>
+    <div data-tour={tourId}>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-display text-sm font-semibold uppercase tracking-widest text-muted-foreground">
           {title}

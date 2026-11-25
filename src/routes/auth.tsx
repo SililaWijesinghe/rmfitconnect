@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Dumbbell, Loader2 } from "lucide-react";
+import { CheckCircle2, Dumbbell, Loader2, Mail } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -52,7 +52,10 @@ function AuthPage() {
 
           <div className="mt-6">
             {mode === "signup" ? (
-              <SignUpForm onSuccess={() => navigate({ to: "/" })} />
+              <SignUpForm
+                onSuccess={() => navigate({ to: "/" })}
+                onSignIn={() => setMode("signin")}
+              />
             ) : (
               <SignInForm
                 onSuccess={(isAdmin) => navigate({ to: isAdmin ? "/admin" : "/" })}
@@ -162,7 +165,13 @@ const signupSchema = z.object({
   weight_kg: z.number().min(25).max(300),
 });
 
-function SignUpForm({ onSuccess }: { onSuccess: () => void }) {
+function SignUpForm({
+  onSuccess,
+  onSignIn,
+}: {
+  onSuccess: () => void;
+  onSignIn: () => void;
+}) {
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -174,6 +183,7 @@ function SignUpForm({ onSuccess }: { onSuccess: () => void }) {
   });
   const [avatar, setAvatar] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [awaiting, setAwaiting] = useState<string | null>(null);
 
   function set<K extends keyof typeof form>(k: K, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -222,6 +232,13 @@ function SignUpForm({ onSuccess }: { onSuccess: () => void }) {
         }
       }
 
+      if (!data.session) {
+        // Email confirmation is required before a session is issued.
+        setAwaiting(parsed.email);
+        toast.success("Account created — confirm your email to continue.");
+        return;
+      }
+
       toast.success("Account created! Waiting for trainer approval.");
       onSuccess();
     } catch (err) {
@@ -230,6 +247,67 @@ function SignUpForm({ onSuccess }: { onSuccess: () => void }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function resend() {
+    if (!awaiting) return;
+    setLoading(true);
+    const { error } = await supabase.auth.resend({ type: "signup", email: awaiting });
+    setLoading(false);
+    if (error) return toast.error(error.message);
+    toast.success("Verification email sent again");
+  }
+
+  if (awaiting) {
+    return (
+      <div className="rm-pop">
+        <div className="btn-neon flex size-11 items-center justify-center rounded-xl">
+          <Mail className="size-5" aria-hidden="true" />
+        </div>
+        <h2 className="mt-4 font-display text-2xl tracking-wide text-balance">
+          Confirm your email
+        </h2>
+        <p className="mt-2 text-sm text-pretty text-muted-foreground">
+          We sent a confirmation link to{" "}
+          <span className="font-medium text-foreground">{awaiting}</span>. You have to confirm it
+          before you can sign in — that's the account security check working.
+        </p>
+        <ul className="mt-4 space-y-2">
+          {[
+            "Open the email and tap the confirmation link",
+            "You'll be returned to the app automatically",
+            "Then sign in and wait for RM to activate you",
+          ].map((step) => (
+            <li key={step} className="flex items-start gap-2 text-sm">
+              <CheckCircle2
+                className="mt-0.5 size-4 shrink-0 text-[color:var(--neon-cyan)]"
+                aria-hidden="true"
+              />
+              <span className="text-pretty">{step}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-4 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-muted-foreground">
+          Nothing in your inbox? Check spam and promotions, then send it again below.
+        </p>
+        <button
+          type="button"
+          onClick={resend}
+          disabled={loading}
+          className="glass mt-4 flex w-full items-center justify-center gap-2 rounded-md px-4 py-3 text-sm hover:bg-white/[0.08] disabled:opacity-60"
+        >
+          {loading ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" aria-hidden="true" />}
+          Send the email again
+        </button>
+        <button
+          type="button"
+          onClick={onSignIn}
+          className="mt-3 w-full text-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        >
+          Already confirmed? Sign in
+        </button>
+      </div>
+    );
   }
 
   return (

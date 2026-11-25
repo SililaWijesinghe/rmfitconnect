@@ -5,10 +5,34 @@ import { HeartPulse, ShieldPlus, Loader2, Save } from "lucide-react";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
+import {
+  GuideButton,
+  SpotlightTour,
+  useFirstVisitGuide,
+  type GuideStep,
+} from "@/components/SpotlightTour";
 
 export const Route = createFileRoute("/_authenticated/health")({
   component: HealthPage,
 });
+
+const HEALTH_GUIDE: GuideStep[] = [
+  {
+    target: "health-injuries",
+    title: "Injuries live here",
+    body: "Aches, past surgeries, mobility limits. The more specific it is, the safer the session.",
+  },
+  {
+    target: "health-allergies",
+    title: "And allergies here",
+    body: "Foods, medications, anything environmental RM should plan around.",
+  },
+  {
+    target: "health-save",
+    title: "Save when you're done",
+    body: "It updates RM's view immediately. Nothing is sent until you tap Save.",
+  },
+];
 
 const schema = z.object({
   injuries: z.string().trim().max(1000),
@@ -21,6 +45,7 @@ function HealthPage() {
   const [form, setForm] = useState({ injuries: "", allergies: "", notes: "" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const guide = useFirstVisitGuide("rm.guide.health.v1");
 
   useEffect(() => {
     (async () => {
@@ -59,15 +84,19 @@ function HealthPage() {
 
   return (
     <div className="space-y-5 pt-4">
-      <div>
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">Your body</p>
-        <h1 className="mt-1 font-display text-3xl font-bold">Health profile</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Keep these up to date so every session is safe and pushes you the right way.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">Your body</p>
+          <h1 className="mt-1 font-display text-3xl font-bold">Health profile</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Keep these up to date so every session is safe and pushes you the right way.
+          </p>
+        </div>
+        <GuideButton onClick={() => guide.setOpen(true)} />
       </div>
 
       <GlassField
+        tourId="health-injuries"
         icon={<HeartPulse className="h-5 w-5 text-[color:var(--neon-magenta)]" />}
         title="Current injuries"
         hint="Aches, past surgeries, mobility limits."
@@ -75,6 +104,7 @@ function HealthPage() {
         onChange={(v) => setForm({ ...form, injuries: v })}
       />
       <GlassField
+        tourId="health-allergies"
         icon={<ShieldPlus className="h-5 w-5 text-[color:var(--neon-cyan)]" />}
         title="Allergies"
         hint="Foods, medications, environmental triggers."
@@ -92,11 +122,19 @@ function HealthPage() {
       <button
         onClick={save}
         disabled={saving}
+        data-tour="health-save"
         className="btn-neon hover:btn-neon-hover flex w-full items-center justify-center gap-2 rounded-md px-4 py-3 text-sm"
       >
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
         Save profile
       </button>
+
+      <SpotlightTour
+        steps={HEALTH_GUIDE}
+        open={guide.open}
+        onOpenChange={guide.setOpen}
+        onComplete={guide.markSeen}
+      />
     </div>
   );
 }
@@ -107,15 +145,17 @@ function GlassField({
   hint,
   value,
   onChange,
+  tourId,
 }: {
   icon: React.ReactNode;
   title: string;
   hint: string;
   value: string;
   onChange: (v: string) => void;
+  tourId?: string;
 }) {
   return (
-    <div className="glass-strong p-5">
+    <div className="glass-strong p-5" data-tour={tourId}>
       <div className="flex items-center gap-2">
         {icon}
         <h3 className="font-display text-lg font-semibold">{title}</h3>

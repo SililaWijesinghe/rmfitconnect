@@ -35,10 +35,10 @@ function AuthedLayout() {
   }
 
   const clientNav = [
-    { to: "/dashboard", icon: LayoutDashboard, label: "Home" },
-    { to: "/book", icon: CalendarPlus, label: "Book" },
-    { to: "/my-bookings", icon: ListChecks, label: "Sessions" },
-    { to: "/health", icon: HeartPulse, label: "Health" },
+    { to: "/dashboard", icon: LayoutDashboard, label: "Home", tour: "nav-dashboard" },
+    { to: "/book", icon: CalendarPlus, label: "Book", tour: "nav-book" },
+    { to: "/my-bookings", icon: ListChecks, label: "Sessions", tour: "nav-sessions" },
+    { to: "/health", icon: HeartPulse, label: "Health", tour: "nav-health" },
   ] as const;
 
   const adminNav = [
@@ -86,6 +86,7 @@ function AuthedLayout() {
               <Link
                 key={item.to}
                 to={item.to}
+                data-tour={"tour" in item ? item.tour : undefined}
                 activeOptions={"exact" in item && item.exact ? { exact: true } : undefined}
                 className="flex flex-1 flex-col items-center gap-0.5 rounded-full px-3 py-2 text-[10px] font-medium text-muted-foreground transition-colors [&.active]:bg-white/10 [&.active]:text-[color:var(--neon-cyan)]"
                 activeProps={{ className: "active" }}

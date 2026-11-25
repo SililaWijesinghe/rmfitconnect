@@ -170,3 +170,108 @@
 @utility glow-ring {
   box-shadow: 0 0 0 1px oklch(1 0 0 / 0.4), 0 0 30px -4px oklch(1 0 0 / 0.5);
 }
+
+/* ---------- Motion ---------- */
+/* Composite-only: transform + opacity. No layout or paint animation. */
+
+@keyframes rm-fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes rm-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes rm-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+@keyframes rm-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rm-ring {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.96);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.28);
+  }
+}
+
+@utility rm-fade-up {
+  animation: rm-fade-up 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility rm-marquee {
+  animation: rm-marquee 34s linear infinite;
+}
+
+@utility rm-float {
+  animation: rm-float 6s ease-in-out infinite;
+}
+
+@utility rm-pop {
+  animation: rm-pop 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility rm-ring {
+  animation: rm-ring 2.6s ease-out infinite;
+}
+
+@utility rm-grid {
+  background-image:
+    linear-gradient(oklch(1 0 0 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(1 0 0 / 0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at 50% 0%, #000 10%, transparent 70%);
+}
+
+@utility rm-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-fade-up,
+  .rm-marquee,
+  .rm-float,
+  .rm-pop,
+  .rm-ring {
+    animation: none !important;
+  }
+  .rm-marquee {
+    transform: none !important;
+  }
+}

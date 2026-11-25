@@ -4,6 +4,12 @@ import { CalendarPlus, HeartPulse, Clock, CheckCircle2, HelpCircle, Activity } f
 
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar } from "@/components/Avatar";
+import {
+  GuideButton,
+  SpotlightTour,
+  useFirstVisitGuide,
+  type GuideStep,
+} from "@/components/SpotlightTour";
 import { calcBMI, bmiCategory } from "@/lib/health-utils";
 
 type Profile = {
@@ -19,10 +25,44 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
+const DASHBOARD_GUIDE: GuideStep[] = [
+  {
+    target: "dashboard-status",
+    title: "Your status badge",
+    body: "Pending until RM approves you, then Active. Booking stays locked until it says Active.",
+  },
+  {
+    target: "dashboard-metrics",
+    title: "Your starting numbers",
+    body: "Age, height and weight feed the BMI card below. They come from your sign-up form.",
+  },
+  {
+    target: "nav-book",
+    title: "Tap Book to reserve a session",
+    body: "Fourteen days of one-hour slots. Morning takes 2 clients, evening takes 4.",
+  },
+  {
+    target: "nav-sessions",
+    title: "Sessions keeps the list",
+    body: "Every booking, upcoming and past, plus the cancel button for each.",
+  },
+  {
+    target: "nav-health",
+    title: "Tell RM about your body",
+    body: "Injuries and allergies are programmed around, so keep this one current.",
+  },
+  {
+    target: "dashboard-guide",
+    title: "Lost later? Tap here",
+    body: "This replays the same guide whenever you need it — nothing is hidden behind it.",
+  },
+];
+
 function Dashboard() {
   const { user } = Route.useRouteContext();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bookings, setBookings] = useState<number>(0);
+  const guide = useFirstVisitGuide("rm.guide.dashboard.v1");
 
   useEffect(() => {
     (async () => {
@@ -57,12 +97,16 @@ function Dashboard() {
             </h1>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+        <div
+          data-tour="dashboard-status"
+          className="mt-4 flex flex-wrap items-center gap-2 rounded-lg text-sm"
+        >
           <StatusBadge status={status} />
+          <GuideButton tourId="dashboard-guide" onClick={() => guide.setOpen(true)} />
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div data-tour="dashboard-metrics" className="grid grid-cols-3 gap-3 rounded-lg">
         <Metric label="Age" value={profile?.age ?? "–"} />
         <Metric label="Height" value={profile?.height_cm ? `${profile.height_cm}` : "–"} unit="cm" />
         <Metric label="Weight" value={profile?.weight_kg ? `${profile.weight_kg}` : "–"} unit="kg" />
@@ -142,6 +186,13 @@ function Dashboard() {
           View all →
         </Link>
       </div>
+
+      <SpotlightTour
+        steps={DASHBOARD_GUIDE}
+        open={guide.open}
+        onOpenChange={guide.setOpen}
+        onComplete={guide.markSeen}
+      />
     </div>
   );
 }
